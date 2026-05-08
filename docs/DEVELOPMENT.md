@@ -38,6 +38,17 @@ make lint          # Check code quality
 make lint-fix      # Auto-fix issues
 ```
 
+## Swagger and OpenAPI
+
+Use `make swagger` to regenerate the checked-in Swagger docs package and
+`docs/openapi.json`.
+
+GoModel intentionally uses `github.com/swaggo/swag/v2/cmd/swag`. The Swagger UI
+is served through Echo v5 and `github.com/swaggo/echo-swagger`'s
+`WrapHandlerV3`, which reads registered specs through `github.com/swaggo/swag/v2`.
+Using the v1 `swag` generator will produce a docs package that does not match
+the Swagger build.
+
 ## Release Hygiene
 
 Releases are generated automatically from merged PRs, categorized by labels and PR titles.
