@@ -164,16 +164,12 @@ func TestBudgetEndpointsUpsertAndResetOneBudget(t *testing.T) {
 
 	upsertReq := httptest.NewRequest(
 		http.MethodPut,
-		"/admin/api/v1/budgets/%2Fteam%2Fbeta/weekly",
-		strings.NewReader(`{"amount":12.5}`),
+		"/admin/api/v1/budgets",
+		strings.NewReader(`{"user_path":"/team/beta","budget_key":{"period":"weekly"},"amount":12.5}`),
 	)
 	upsertReq.Header.Set("Content-Type", "application/json")
 	upsertRec := httptest.NewRecorder()
 	upsertCtx := e.NewContext(upsertReq, upsertRec)
-	upsertCtx.SetPathValues(echo.PathValues{
-		{Name: "user_path", Value: "%2Fteam%2Fbeta"},
-		{Name: "period", Value: "weekly"},
-	})
 	if err := h.UpsertBudget(upsertCtx); err != nil {
 		t.Fatalf("UpsertBudget() failed: %v", err)
 	}
@@ -213,16 +209,12 @@ func TestBudgetEndpointsUpsertMarksConfigBudgetManual(t *testing.T) {
 	e := echo.New()
 	req := httptest.NewRequest(
 		http.MethodPut,
-		"/admin/api/v1/budgets/%2Fteam/daily",
-		strings.NewReader(`{"amount":12.5}`),
+		"/admin/api/v1/budgets",
+		strings.NewReader(`{"user_path":"/team","budget_key":{"period":"daily"},"amount":12.5}`),
 	)
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
-	c.SetPathValues(echo.PathValues{
-		{Name: "user_path", Value: "%2Fteam"},
-		{Name: "period", Value: "daily"},
-	})
 
 	if err := h.UpsertBudget(c); err != nil {
 		t.Fatalf("UpsertBudget() failed: %v", err)
@@ -238,6 +230,78 @@ func TestBudgetEndpointsUpsertMarksConfigBudgetManual(t *testing.T) {
 	}
 }
 
+func TestBudgetEndpointsUpsertAcceptsNumericPeriodString(t *testing.T) {
+	store := &adminBudgetStore{}
+	h := newBudgetHandler(t, store)
+	e := echo.New()
+	req := httptest.NewRequest(
+		http.MethodPut,
+		"/admin/api/v1/budgets",
+		strings.NewReader(`{"user_path":"/team","budget_key":{"period":"604800"},"amount":12.5}`),
+	)
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	c := e.NewContext(req, rec)
+
+	if err := h.UpsertBudget(c); err != nil {
+		t.Fatalf("UpsertBudget() failed: %v", err)
+	}
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d body=%s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	if len(store.budgets) != 1 || store.budgets[0].PeriodSeconds != budget.PeriodWeeklySeconds {
+		t.Fatalf("stored budgets = %+v, want weekly budget", store.budgets)
+	}
+}
+
+func TestBudgetEndpointsRejectInvalidBudgetKey(t *testing.T) {
+	tests := []struct {
+		name string
+		body string
+		run  func(*Handler, *echo.Context) error
+	}{
+		{
+			name: "missing budget key",
+			body: `{"user_path":"/team","amount":12.5}`,
+			run:  (*Handler).UpsertBudget,
+		},
+		{
+			name: "empty budget key",
+			body: `{"user_path":"/team","budget_key":{},"amount":12.5}`,
+			run:  (*Handler).UpsertBudget,
+		},
+		{
+			name: "ambiguous budget key",
+			body: `{"user_path":"/team","budget_key":{"period":"daily","period_seconds":86400},"amount":12.5}`,
+			run:  (*Handler).UpsertBudget,
+		},
+		{
+			name: "delete missing budget key",
+			body: `{"user_path":"/team"}`,
+			run:  (*Handler).DeleteBudget,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			store := &adminBudgetStore{}
+			h := newBudgetHandler(t, store)
+			e := echo.New()
+			req := httptest.NewRequest(http.MethodPut, "/admin/api/v1/budgets", strings.NewReader(tt.body))
+			req.Header.Set("Content-Type", "application/json")
+			rec := httptest.NewRecorder()
+			c := e.NewContext(req, rec)
+
+			if err := tt.run(h, c); err != nil {
+				t.Fatalf("handler failed: %v", err)
+			}
+			if rec.Code != http.StatusBadRequest {
+				t.Fatalf("status = %d, want %d body=%s", rec.Code, http.StatusBadRequest, rec.Body.String())
+			}
+		})
+	}
+}
+
 func TestBudgetEndpointsDeleteBudget(t *testing.T) {
 	store := &adminBudgetStore{
 		budgets: []budget.Budget{
@@ -249,15 +313,12 @@ func TestBudgetEndpointsDeleteBudget(t *testing.T) {
 	e := echo.New()
 	req := httptest.NewRequest(
 		http.MethodDelete,
-		"/admin/api/v1/budgets/%2Fteam%2Fbeta/604800",
-		nil,
+		"/admin/api/v1/budgets",
+		strings.NewReader(`{"user_path":"/team/beta","budget_key":{"period_seconds":604800}}`),
 	)
+	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
 	c := e.NewContext(req, rec)
-	c.SetPathValues(echo.PathValues{
-		{Name: "user_path", Value: "%2Fteam%2Fbeta"},
-		{Name: "period", Value: "604800"},
-	})
 
 	if err := h.DeleteBudget(c); err != nil {
 		t.Fatalf("DeleteBudget() failed: %v", err)
@@ -282,13 +343,10 @@ func TestBudgetEndpointsMissingMutationsReturnNotFound(t *testing.T) {
 				store.deleteErr = budget.ErrNotFound
 			},
 			run: func(h *Handler, e *echo.Echo) *httptest.ResponseRecorder {
-				req := httptest.NewRequest(http.MethodDelete, "/admin/api/v1/budgets/%2Fteam/86400", nil)
+				req := httptest.NewRequest(http.MethodDelete, "/admin/api/v1/budgets", strings.NewReader(`{"user_path":"/team","budget_key":{"period_seconds":86400}}`))
+				req.Header.Set("Content-Type", "application/json")
 				rec := httptest.NewRecorder()
 				c := e.NewContext(req, rec)
-				c.SetPathValues(echo.PathValues{
-					{Name: "user_path", Value: "%2Fteam"},
-					{Name: "period", Value: "86400"},
-				})
 				if err := h.DeleteBudget(c); err != nil {
 					t.Fatalf("DeleteBudget() returned handler error: %v", err)
 				}
