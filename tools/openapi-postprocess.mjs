@@ -111,6 +111,177 @@ function ensureResponsesInputElementSchema() {
   };
 }
 
+function anthropicContentSchema() {
+  return {
+    oneOf: [
+      { type: "string" },
+      {
+        type: "array",
+        items: { $ref: "#/components/schemas/anthropicapi.ContentBlock" },
+      },
+    ],
+  };
+}
+
+function freeFormObjectSchema() {
+  return {
+    type: "object",
+    additionalProperties: true,
+  };
+}
+
+function stringOrFreeFormObjectSchema() {
+  return {
+    oneOf: [
+      { type: "string" },
+      freeFormObjectSchema(),
+    ],
+  };
+}
+
+function ensureAnthropicContentBlockSchema() {
+  const schemas = spec.components?.schemas;
+  if (!schemas) {
+    throw new Error("missing OpenAPI components.schemas");
+  }
+  schemas["anthropicapi.ContentBlock"] = {
+    type: "object",
+    properties: {
+      content: anthropicContentSchema(),
+      id: { type: "string" },
+      input: freeFormObjectSchema(),
+      is_error: { type: "boolean" },
+      name: { type: "string" },
+      source: stringOrFreeFormObjectSchema(),
+      text: { type: "string" },
+      thinking: { type: "string" },
+      tool_use_id: { type: "string" },
+      type: { type: "string" },
+    },
+  };
+}
+
+function applyAnthropicMessageSchemas() {
+  ensureAnthropicContentBlockSchema();
+  schema("anthropicapi.Message").properties.content = anthropicContentSchema();
+  schema("anthropicapi.MessagesRequest").properties.system = anthropicContentSchema();
+  schema("anthropicapi.ResponseContentBlock").properties.input = freeFormObjectSchema();
+  schema("anthropicapi.Tool").properties.input_schema = freeFormObjectSchema();
+}
+
+function constStringSchema(value) {
+  return {
+    type: "string",
+    enum: [value],
+  };
+}
+
+function ensureAnthropicSSEEventSchemas() {
+  const schemas = spec.components?.schemas;
+  if (!schemas) {
+    throw new Error("missing OpenAPI components.schemas");
+  }
+  schemas["anthropicapi.SSEMessageStartEvent"] = {
+    type: "object",
+    required: ["message", "type"],
+    properties: {
+      type: constStringSchema("message_start"),
+      message: { $ref: "#/components/schemas/anthropicapi.MessagesResponse" },
+    },
+  };
+  schemas["anthropicapi.SSEContentBlockStartEvent"] = {
+    type: "object",
+    required: ["content_block", "index", "type"],
+    properties: {
+      type: constStringSchema("content_block_start"),
+      index: { type: "integer" },
+      content_block: { $ref: "#/components/schemas/anthropicapi.ResponseContentBlock" },
+    },
+  };
+  schemas["anthropicapi.SSEContentBlockDeltaEvent"] = {
+    type: "object",
+    required: ["delta", "index", "type"],
+    properties: {
+      type: constStringSchema("content_block_delta"),
+      index: { type: "integer" },
+      delta: freeFormObjectSchema(),
+    },
+  };
+  schemas["anthropicapi.SSEContentBlockStopEvent"] = {
+    type: "object",
+    required: ["index", "type"],
+    properties: {
+      type: constStringSchema("content_block_stop"),
+      index: { type: "integer" },
+    },
+  };
+  schemas["anthropicapi.SSEMessageDeltaEvent"] = {
+    type: "object",
+    required: ["delta", "type"],
+    properties: {
+      type: constStringSchema("message_delta"),
+      delta: freeFormObjectSchema(),
+      usage: { $ref: "#/components/schemas/anthropicapi.Usage" },
+    },
+  };
+  schemas["anthropicapi.SSEMessageStopEvent"] = {
+    type: "object",
+    required: ["type"],
+    properties: {
+      type: constStringSchema("message_stop"),
+    },
+  };
+  schemas["anthropicapi.SSEPingEvent"] = {
+    type: "object",
+    required: ["type"],
+    properties: {
+      type: constStringSchema("ping"),
+    },
+  };
+  schemas["anthropicapi.SSEErrorEvent"] = {
+    type: "object",
+    required: ["error", "type"],
+    properties: {
+      type: constStringSchema("error"),
+      error: { $ref: "#/components/schemas/anthropicapi.ErrorObject" },
+    },
+  };
+  schemas["anthropicapi.SSEUnknownEvent"] = {
+    description: "Fallback for future Anthropic streaming event payloads.",
+    type: "object",
+    required: ["type"],
+    properties: {
+      type: { type: "string" },
+    },
+    additionalProperties: true,
+  };
+  schemas["anthropicapi.SSEEventFrame"] = {
+    description: "One server-sent event frame emitted by streaming /v1/messages. On the wire each frame is sent as event: <name> and data: <JSON payload>. Unknown event payloads are accepted for forward compatibility.",
+    anyOf: [
+      { $ref: "#/components/schemas/anthropicapi.SSEMessageStartEvent" },
+      { $ref: "#/components/schemas/anthropicapi.SSEContentBlockStartEvent" },
+      { $ref: "#/components/schemas/anthropicapi.SSEContentBlockDeltaEvent" },
+      { $ref: "#/components/schemas/anthropicapi.SSEContentBlockStopEvent" },
+      { $ref: "#/components/schemas/anthropicapi.SSEMessageDeltaEvent" },
+      { $ref: "#/components/schemas/anthropicapi.SSEMessageStopEvent" },
+      { $ref: "#/components/schemas/anthropicapi.SSEPingEvent" },
+      { $ref: "#/components/schemas/anthropicapi.SSEErrorEvent" },
+      { $ref: "#/components/schemas/anthropicapi.SSEUnknownEvent" },
+    ],
+  };
+}
+
+function applyAnthropicMessagesStreamSchema() {
+  ensureAnthropicSSEEventSchemas();
+  const streamResponse = spec.paths?.["/v1/messages"]?.post?.responses?.["200"]?.content?.["text/event-stream"];
+  if (!streamResponse) {
+    throw new Error("missing OpenAPI text/event-stream response: POST /v1/messages 200");
+  }
+  streamResponse.schema = {
+    $ref: "#/components/schemas/anthropicapi.SSEEventFrame",
+  };
+}
+
 function ensureBearerAuthSecurityScheme() {
   const securitySchemes = spec.components?.securitySchemes;
   if (!securitySchemes?.BearerAuth) {
@@ -222,6 +393,8 @@ function applyBudgetKeySchemaConstraints() {
 
 spec.servers = parseServers(process.env.DOCS_API_SERVERS);
 ensureResponsesInputElementSchema();
+applyAnthropicMessageSchemas();
+applyAnthropicMessagesStreamSchema();
 ensureBearerAuthSecurityScheme();
 ensureRequiredProperty("admin.recalculatePricingRequest", "confirmation");
 ensureRequiredProperty("admin.upsertBudgetRequest", "amount");
