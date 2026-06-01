@@ -116,7 +116,7 @@ func TestNativeResponseByProviderWrapsContextCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
-	_, _, err := nativeResponseByProvider[*core.ResponsesResponse](ctx, provider, "", func(core.NativeResponseLifecycleRoutableProvider, string) (*core.ResponsesResponse, error) {
+	_, _, err := nativeResponseByProvider(ctx, provider, "", func(core.NativeResponseLifecycleRoutableProvider, string) (*core.ResponsesResponse, error) {
 		t.Fatal("provider call should not run after context cancellation")
 		return nil, nil
 	})

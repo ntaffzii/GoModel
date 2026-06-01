@@ -253,7 +253,7 @@ func TestInternalChatCompletionExecutor_PreservesBoundedAuditCapture(t *testing.
 		"/v1/chat/completions",
 		nil,
 		nil,
-		map[string][]string{"Traceparent": []string{"00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"}},
+		map[string][]string{"Traceparent": {"00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01"}},
 		"application/json",
 		nil,
 		false,

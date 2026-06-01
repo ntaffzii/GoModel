@@ -36,7 +36,7 @@ func (s *audioService) CreateSpeech(c *echo.Context) error {
 		return handleError(c, err)
 	}
 
-	req, err := canonicalJSONRequestFromSemantics[*core.AudioSpeechRequest](c, core.DecodeAudioSpeechRequest)
+	req, err := canonicalJSONRequestFromSemantics(c, core.DecodeAudioSpeechRequest)
 	if err != nil {
 		return handleError(c, core.NewInvalidRequestError("invalid request body: "+err.Error(), err))
 	}

@@ -47,7 +47,7 @@ func (s *nativeResponseService) GetResponse(c *echo.Context) error {
 		auditResponseEntry(c, storedProvider(stored))
 		return c.JSON(http.StatusOK, stored.Response)
 	}
-	if err != nil && !errors.Is(err, responsestore.ErrNotFound) {
+	if !errors.Is(err, responsestore.ErrNotFound) {
 		return handleError(c, err)
 	}
 
@@ -79,7 +79,7 @@ func (s *nativeResponseService) ListResponseInputItems(c *echo.Context) error {
 		auditResponseEntry(c, storedProvider(stored))
 		return c.JSON(http.StatusOK, paginateStoredResponseInputItems(stored.InputItems, params))
 	}
-	if err != nil && !errors.Is(err, responsestore.ErrNotFound) {
+	if !errors.Is(err, responsestore.ErrNotFound) {
 		return handleError(c, err)
 	}
 
@@ -128,7 +128,7 @@ func (s *nativeResponseService) CancelResponse(c *echo.Context) error {
 		}
 		return c.JSON(http.StatusOK, resp)
 	}
-	if err != nil && !errors.Is(err, responsestore.ErrNotFound) {
+	if !errors.Is(err, responsestore.ErrNotFound) {
 		return handleError(c, err)
 	}
 
@@ -174,7 +174,7 @@ func (s *nativeResponseService) DeleteResponse(c *echo.Context) error {
 		deleteResp.Deleted = true
 		return c.JSON(http.StatusOK, deleteResp)
 	}
-	if err != nil && !errors.Is(err, responsestore.ErrNotFound) {
+	if !errors.Is(err, responsestore.ErrNotFound) {
 		return handleError(c, err)
 	}
 
@@ -259,7 +259,7 @@ func (s *nativeResponseService) CompactResponse(c *echo.Context) error {
 }
 
 func (s *nativeResponseService) utilityRequest(c *echo.Context) (*core.ResponsesRequest, string, error) {
-	req, err := canonicalJSONRequestFromSemantics[*core.ResponsesRequest](c, core.DecodeResponsesRequest)
+	req, err := canonicalJSONRequestFromSemantics(c, core.DecodeResponsesRequest)
 	if err != nil {
 		return nil, "", core.NewInvalidRequestError("invalid request body: "+err.Error(), err)
 	}

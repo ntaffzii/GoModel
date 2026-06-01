@@ -55,7 +55,7 @@ func (s *nativeBatchService) batch() *gateway.BatchOrchestrator {
 }
 
 func (s *nativeBatchService) Batches(c *echo.Context) error {
-	req, err := canonicalJSONRequestFromSemantics[*core.BatchRequest](c, core.DecodeBatchRequest)
+	req, err := canonicalJSONRequestFromSemantics(c, core.DecodeBatchRequest)
 	if err != nil {
 		return handleError(c, core.NewInvalidRequestError("invalid request body: "+err.Error(), err))
 	}

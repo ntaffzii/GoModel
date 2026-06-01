@@ -145,7 +145,7 @@ func handleTranslatedJSON[Req any](
 	prepare func(*translatedInferenceService, context.Context, Req, gateway.RequestMeta) (context.Context, Req, *core.Workflow, error),
 	dispatch func(*echo.Context, Req, *core.Workflow) error,
 ) error {
-	req, err := canonicalJSONRequestFromSemantics[Req](c, decode)
+	req, err := canonicalJSONRequestFromSemantics(c, decode)
 	if err != nil {
 		return handleError(c, core.NewInvalidRequestError("invalid request body: "+err.Error(), err))
 	}
@@ -381,7 +381,7 @@ func (s *translatedInferenceService) tryFastPathStreamingChatPassthrough(c *echo
 }
 
 func (s *translatedInferenceService) Embeddings(c *echo.Context) error {
-	req, err := canonicalJSONRequestFromSemantics[*core.EmbeddingRequest](c, core.DecodeEmbeddingRequest)
+	req, err := canonicalJSONRequestFromSemantics(c, core.DecodeEmbeddingRequest)
 	if err != nil {
 		return handleError(c, core.NewInvalidRequestError("invalid request body: "+err.Error(), err))
 	}

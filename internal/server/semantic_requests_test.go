@@ -44,10 +44,10 @@ func TestCanonicalJSONRequestFromSemanticEnvelope_CachesChatRequest(t *testing.T
 
 	c := e.NewContext(req, httptest.NewRecorder())
 
-	first, err := canonicalJSONRequestFromSemantics[*core.ChatRequest](c, core.DecodeChatRequest)
+	first, err := canonicalJSONRequestFromSemantics(c, core.DecodeChatRequest)
 	require.NoError(t, err)
 
-	second, err := canonicalJSONRequestFromSemantics[*core.ChatRequest](c, core.DecodeChatRequest)
+	second, err := canonicalJSONRequestFromSemantics(c, core.DecodeChatRequest)
 	require.NoError(t, err)
 
 	require.Same(t, first, second)
@@ -87,10 +87,10 @@ func TestCanonicalJSONRequestFromSemanticEnvelope_CachesResponsesRequest(t *test
 
 	c := e.NewContext(req, httptest.NewRecorder())
 
-	first, err := canonicalJSONRequestFromSemantics[*core.ResponsesRequest](c, core.DecodeResponsesRequest)
+	first, err := canonicalJSONRequestFromSemantics(c, core.DecodeResponsesRequest)
 	require.NoError(t, err)
 
-	second, err := canonicalJSONRequestFromSemantics[*core.ResponsesRequest](c, core.DecodeResponsesRequest)
+	second, err := canonicalJSONRequestFromSemantics(c, core.DecodeResponsesRequest)
 	require.NoError(t, err)
 
 	require.Same(t, first, second)
@@ -123,7 +123,7 @@ func TestCanonicalJSONRequestFromSemanticEnvelope_FallsBackToLiveBodyWhenIngress
 
 	c := e.NewContext(req, httptest.NewRecorder())
 
-	embeddingReq, err := canonicalJSONRequestFromSemantics[*core.EmbeddingRequest](c, core.DecodeEmbeddingRequest)
+	embeddingReq, err := canonicalJSONRequestFromSemantics(c, core.DecodeEmbeddingRequest)
 	require.NoError(t, err)
 	require.Equal(t, "text-embedding-3-large", embeddingReq.Model)
 	require.Equal(t, "openai", embeddingReq.Provider)
@@ -169,10 +169,10 @@ func TestCanonicalJSONRequestFromSemanticEnvelope_CachesBatchRequest(t *testing.
 
 	c := e.NewContext(req, httptest.NewRecorder())
 
-	first, err := canonicalJSONRequestFromSemantics[*core.BatchRequest](c, core.DecodeBatchRequest)
+	first, err := canonicalJSONRequestFromSemantics(c, core.DecodeBatchRequest)
 	require.NoError(t, err)
 
-	second, err := canonicalJSONRequestFromSemantics[*core.BatchRequest](c, core.DecodeBatchRequest)
+	second, err := canonicalJSONRequestFromSemantics(c, core.DecodeBatchRequest)
 	require.NoError(t, err)
 
 	require.Same(t, first, second)
