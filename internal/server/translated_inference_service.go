@@ -478,7 +478,7 @@ func (s *translatedInferenceService) handleStreamingReadCloser(
 			observers = append(observers, usageObserver)
 		}
 	}
-	wrappedStream := streaming.NewObservedSSEStream(stream, observers...)
+	wrappedStream := streaming.NewObservedSSEStream(streaming.NewJSONUnwrapperReader(stream), observers...)
 	if outerWrap != nil {
 		wrappedStream = outerWrap(wrappedStream)
 	}

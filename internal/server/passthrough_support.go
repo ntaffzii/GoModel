@@ -296,7 +296,7 @@ func (s *passthroughService) proxyPassthroughResponse(c *echo.Context, providerT
 				observers = append(observers, observer)
 			}
 		}
-		wrappedStream := streaming.NewObservedSSEStream(resp.Body, observers...)
+		wrappedStream := streaming.NewObservedSSEStream(streaming.NewJSONUnwrapperReader(resp.Body), observers...)
 		if len(observers) > 0 {
 			defer func() {
 				_ = wrappedStream.Close()
