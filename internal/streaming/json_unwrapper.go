@@ -13,8 +13,6 @@ type JSONUnwrapperReader struct {
 	state       int // 0: string, 1: escape, 2: unicode
 	unicodeBuf  [4]byte
 	unicodeLen  int
-	unreadByte  byte
-	hasUnread   bool
 	eofReached  bool
 	decoded     []byte
 }
@@ -35,8 +33,8 @@ func (u *JSONUnwrapperReader) Read(p []byte) (n int, err error) {
 	}
 
 	if !u.checked {
-		var buf [1]byte
-		nRead, readErr := u.ReadCloser.Read(buf[:])
+		var firstChunk [4096]byte
+		nRead, readErr := u.ReadCloser.Read(firstChunk[:])
 		if nRead == 0 {
 			if readErr != nil {
 				return 0, readErr
@@ -44,25 +42,24 @@ func (u *JSONUnwrapperReader) Read(p []byte) (n int, err error) {
 			return 0, nil
 		}
 		u.checked = true
-		if buf[0] == '"' {
+		if firstChunk[0] == '"' {
 			u.isJSON = true
 			u.state = stateString
+			u.decodeBytes(firstChunk[1:nRead])
 		} else {
 			u.isJSON = false
-			u.unreadByte = buf[0]
-			u.hasUnread = true
+			u.decoded = append(u.decoded, firstChunk[:nRead]...)
 		}
 		if readErr != nil && readErr != io.EOF {
-			return 0, readErr
+			return len(u.decoded), readErr
 		}
 	}
 
 	if !u.isJSON {
-		if u.hasUnread {
-			p[0] = u.unreadByte
-			u.hasUnread = false
-			nRead, readErr := u.ReadCloser.Read(p[1:])
-			return nRead + 1, readErr
+		if len(u.decoded) > 0 {
+			nCopied := copy(p, u.decoded)
+			u.decoded = u.decoded[nCopied:]
+			return nCopied, nil
 		}
 		return u.ReadCloser.Read(p)
 	}
@@ -89,19 +86,38 @@ func (u *JSONUnwrapperReader) Read(p []byte) (n int, err error) {
 		return 0, nil
 	}
 
+	u.decodeBytes(raw[:nRaw])
+
+	if len(u.decoded) > 0 {
+		nCopied := copy(p, u.decoded)
+		u.decoded = u.decoded[nCopied:]
+		return nCopied, nil
+	}
+
+	if rawErr == io.EOF {
+		u.eofReached = true
+		return 0, io.EOF
+	}
+
+	return 0, nil
+}
+
+func (u *JSONUnwrapperReader) decodeBytes(raw []byte) {
 	rawIdx := 0
+	nRaw := len(raw)
 	for rawIdx < nRaw {
 		b := raw[rawIdx]
 		rawIdx++
 
 		switch u.state {
 		case stateString:
-			if b == '\\' {
+			switch b {
+			case '\\':
 				u.state = stateEscape
-			} else if b == '"' {
+			case '"':
 				u.eofReached = true
 				rawIdx = nRaw
-			} else {
+			default:
 				u.decoded = append(u.decoded, b)
 			}
 
@@ -157,17 +173,4 @@ func (u *JSONUnwrapperReader) Read(p []byte) (n int, err error) {
 			}
 		}
 	}
-
-	if len(u.decoded) > 0 {
-		nCopied := copy(p, u.decoded)
-		u.decoded = u.decoded[nCopied:]
-		return nCopied, nil
-	}
-
-	if rawErr == io.EOF {
-		u.eofReached = true
-		return 0, io.EOF
-	}
-
-	return 0, nil
 }
