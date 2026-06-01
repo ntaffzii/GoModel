@@ -5,6 +5,7 @@
 
 # Environment variables
 /.env
+/.venv/
 
 # User config (created from config/config.example.yaml)
 /config/config.yaml
