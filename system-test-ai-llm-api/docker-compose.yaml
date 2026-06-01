@@ -1,0 +1,22 @@
+services:
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: system-test-open-webui
+    ports:
+      - "${OPEN_WEBUI_PORT:-3000}:8080"
+    environment:
+      # Main LLM connection — through GoModel gateway
+      - OPENAI_API_BASE_URL=${GOMODEL_BASE_URL:-http://host.docker.internal:8080/v1}
+      - OPENAI_API_KEY=${GOMODEL_API_KEY:-not-needed}
+      - ENABLE_OLLAMA_API=False
+      # RAG embedding — use UBUAI's embedding endpoint directly
+      - RAG_EMBEDDING_ENGINE=openai
+      - RAG_EMBEDDING_MODEL=openai/text-embedding-3-small
+      - RAG_OPENAI_API_BASE_URL=${UBUAI_BASE_URL:-https://aigateway.ubu.ac.th/api/v1}
+      - RAG_OPENAI_API_KEY=${UBUAI_API_KEY}
+    volumes:
+      - open-webui_data:/app/backend/data
+    restart: unless-stopped
+
+volumes:
+  open-webui_data:
